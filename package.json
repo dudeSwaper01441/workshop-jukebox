@@ -1,0 +1,13 @@
+{
+  "name": "workshop-jukebox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun start.js",
+    "dev": "bun start.js --watch",
+    "build": "bun run --cwd web build"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  }
+}

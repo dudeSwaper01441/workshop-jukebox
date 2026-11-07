@@ -1,0 +1,18 @@
+{
+  "name": "Workshop Jukebox",
+  "short_name": "Jukebox",
+  "description": "Song-request jukebox for the workshop — search Spotify, request songs, watch them play on the big screen.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0e0d",
+  "theme_color": "#1db954",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

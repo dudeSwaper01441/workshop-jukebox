@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0e0d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Jukebox" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Workshop Jukebox</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Service worker registration: gives the jukebox an offline shell and
+      // caches static assets so the app opens even on a flaky event Wi-Fi.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            if (reg.installing) {
+              console.log('[sw] installing');
+            } else if (reg.waiting) {
+              console.log('[sw] waiting');
+            } else if (reg.active) {
+              console.log('[sw] active');
+            }
+          })
+          .catch((e) => console.log('[sw] registration failed:', e.message));
+      }
+    </script>
+  </body>
+</html>

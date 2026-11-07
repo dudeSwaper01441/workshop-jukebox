@@ -1,0 +1,11 @@
+{
+  "name": "jukebox-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "auth": "bun --env-file=.env auth.js",
+    "start": "bun --env-file=.env server.js",
+    "dev": "bun --watch --env-file=.env server.js"
+  },
+  "dependencies": { "express": "^5.1.0", "ws": "^8.18.0" }
+}
