@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, eta, fmt, useJukebox, useTicker } from './api'
 import LyricsView from './LyricsView'
+import MeshBackdrop from './MeshBackdrop'
 import Stats from './Stats'
 import Status from './Status'
 import {
@@ -16,11 +17,38 @@ import {
   IconWifiOff,
 } from './icons'
 import type { Now, Track } from './api'
+import type { BeatSignal, MeshLevels } from './useMeshAudio'
 
 const SEARCH_DELAY = 250
 const CELEBRATION_MS = 5000
 const LEAD_OUT_MS = 5000 // TV lyrics view exits this long before the song ends
 const INTRO_MS = 5000 // ...and waits this long into the new song before returning
+
+// The TV signage (song view, lyrics view, and ApMu) uses the same mesh
+// backdrop as /display, but this page captures no audio of its own, so the
+// backdrop runs in idle mode (slow drift, no reaction). A module-scope
+// sampler keeps `sample` referentially stable, so MeshBackdrop is not torn
+// down and re-created on every render.
+const IDLE_MESH: MeshLevels = {
+  beat: false,
+  beatAt: 0,
+  beatSeq: 0,
+  strength: 0,
+  bass: 0,
+  energy: 0,
+  rawBass: 0,
+  mid: 0,
+  treble: 0,
+  shimmer: 0,
+  threshold: 0,
+  flux: 0,
+  rms: 0,
+  latencyMs: 0,
+  pulsesPer10s: 0,
+  intervals: [],
+  mode: 'idle',
+}
+const sampleIdleMesh = () => IDLE_MESH
 
 export default function Guest() {
   const { state, offline, refresh } = useJukebox()
@@ -266,22 +294,16 @@ export default function Guest() {
   }, [])
   const apmuShowLyrics = !!uri && (apmuSync.uri !== uri || apmuSync.ok)
   const apmuGridClass = 'apmu-grid' + (apmuShowLyrics ? '' : ' solo') + (apmuFading ? ' leaving' : '')
-  // Apple-style backdrop: fullscreen blurred art, previous song holds
-  // underneath while the new one fades in. Stacked (max 2) and keyed by
-  // image so a change crossfades instead of swapping. The render-phase
-  // setState below is the documented adjust-during-render pattern.
-  const artKey = signage ? (songForArt?.image ?? null) : null
-  const [bgs, setBgs] = useState<string[]>([])
-  // Keep the backdrop stack (max 2) keyed by image so a song change crossfades
-  // instead of swapping. Updated in an effect (not during render) to avoid
-  // React StrictMode double-invocation issues.
-  useEffect(() => {
-    if (artKey && bgs[bgs.length - 1] !== artKey) {
-      setBgs((prev) => (prev[prev.length - 1] !== artKey ? [...prev.slice(-1), artKey] : prev))
-    } else if (!signage && bgs.length) {
-      setBgs([])
-    }
-  }, [artKey, signage, bgs])
+  // Shared beat bus for MeshBackdrop; idle mode never publishes a beat, so the
+  // ring-less TV page just needs a stable ref to satisfy the backdrop contract.
+  const meshBeatBus = useRef<BeatSignal>({
+    seq: 0,
+    detSeq: -1,
+    at: 0,
+    strength: 0,
+    source: 'audio',
+    listenerUntil: 0,
+  })
 
   // success toast auto-dismisses; errors stay until the next keystroke
   useEffect(() => {
@@ -382,15 +404,12 @@ export default function Guest() {
   if (signage) {
     return (
       <main className="signage" style={{ cursor: showExit ? undefined : 'none' }}>
-        {bgs.map((src, i) => (
-          <img
-            key={src}
-            className={i < bgs.length - 1 ? 'signage-bg under' : 'signage-bg'}
-            src={src}
-            alt=""
-            aria-hidden="true"
-          />
-        ))}
+        <MeshBackdrop
+          enabled
+          artUrl={songForArt?.image ?? null}
+          sample={sampleIdleMesh}
+          beatBus={meshBeatBus}
+        />
         <div className="signage-shade" aria-hidden="true" />
         <div className={showExit ? 'signage-controls' : 'signage-controls hidden'}>
           <button
@@ -533,7 +552,7 @@ export default function Guest() {
                 </section>
                 {apmuShowLyrics && (
                   <section className="apmu-right" aria-label="Lyrics">
-                    <LyricsView uri={liveNow?.uri ?? null} positionMs={tvElapsed} onSync={reportApmuSync} fontClass={lyricsFontClass} />
+                    <LyricsView uri={liveNow?.uri ?? null} positionMs={tvElapsed} onSync={reportApmuSync} fontClass={lyricsFontClass} fluid />
                   </section>
                 )}
               </div>

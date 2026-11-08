@@ -1,3 +1,16 @@
-server/node_modules/
+# Dependencies
 node_modules/
+server/node_modules/
+
+# Secrets and machine-local runtime state (never commit)
 *.env
+server/tokens.json
+server/queue.json
+server/.cli-path
+
+# Local media / generated test data (not used by the app)
+server/songs/
+server/beatgrids/
+
+# Screenshots from manual UI checks
+shots/

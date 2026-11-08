@@ -5,7 +5,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { WebSocketServer } from 'ws'
+import { WebSocketServer, WebSocket } from 'ws'
 import { fetchLyrics } from './lyrics.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -1055,6 +1055,7 @@ app.delete('/api/admin/queue/:id', admin, (req, res) => {
   }
   queue = queue.filter((i) => i !== item)
   saveQueue()
+  broadcastState()
   res.json({ ok: true })
 })
 
@@ -1092,23 +1093,22 @@ app.use((err, req, res, next) => {
 })
 
 // ---------- websocket for real-time state push ----------
+// The payload is only a notification; clients re-fetch /api/state because the
+// state is personalized (queue items are marked "mine" per browser id).
 const httpServer = http.createServer(app)
 const wss = new WebSocketServer({ server: httpServer, path: '/api/ws' })
-const wsClients = new Set()
 
 function broadcastState() {
   const payload = JSON.stringify({ type: 'state-update', ts: Date.now() })
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
-      try { client.send(payload) } catch {}
+      try {
+        client.send(payload)
+      } catch {
+        // a dead socket will be cleaned up by ws
+      }
     }
   }
 }
-
-wss.on('connection', (client) => {
-  wsClients.add(client)
-  client.on('close', () => wsClients.delete(client))
-  client.on('error', () => wsClients.delete(client))
-})
 
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`Jukebox running: http://localhost:${PORT}  (admin: /admin)`))

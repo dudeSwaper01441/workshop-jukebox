@@ -178,13 +178,26 @@ function quantize(data: Uint8ClampedArray): MeshPalette {
     if (chosen.every((o) => colorDistance(c, o) > 40)) chosen.push(c)
   }
 
-  const blobs = chosen.map((c) => {
-    // lift muted album art into a usable light source: the shader adds the
-    // blur, so the palette can be a little brighter than the cover itself
-    const s = Math.min(0.9, Math.max(0.35, c.s * 1.2 + 0.08))
-    const l = Math.min(0.62, Math.max(0.28, c.l))
-    return hslToHex(c.h, s, l)
-  })
+  const liftSat = (c: Candidate) => Math.min(0.9, Math.max(0.35, c.s * 1.2 + 0.08))
+  const liftLum = (c: Candidate) => Math.min(0.62, Math.max(0.28, c.l))
+  const blobs = chosen.map((c) => hslToHex(c.h, liftSat(c), liftLum(c)))
+
+  // A cover with fewer than four distinct hues (a solid red sleeve, a mostly
+  // black cover) must not borrow the unrelated default blob colours: the
+  // shader adds the blobs, so blue+teal+magenta over a solid cover sum to a
+  // grey/purple wash. Instead tilt the hue of the colour we did find, so vivid
+  // art stays vivid (red stays red) and a muted/dark cover stays moody.
+  const seed = chosen[0]
+  if (seed) {
+    const offsets = [0.045, -0.05, 0.1]
+    const muted = seed.s <= 0.16 || seed.l < 0.16
+    const s = muted ? Math.min(0.32, seed.s + 0.08) : liftSat(seed)
+    const l = muted ? Math.max(0.12, Math.min(0.2, seed.l + 0.06)) : liftLum(seed)
+    for (let i = 0; blobs.length < 4; i++) {
+      const h = (seed.h + offsets[i % offsets.length] + 1) % 1
+      blobs.push(hslToHex(h, s, l))
+    }
+  }
   while (blobs.length < 4) blobs.push(DEFAULT_PALETTE[blobs.length])
 
   const darkest = candidates.reduce((best, c) => (c.l < best.l ? c : best), candidates[0])

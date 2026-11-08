@@ -471,6 +471,19 @@ export default function Display() {
   const dayGreeting =
     hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
+  // Collapse the lyrics column when the track has no synced lines, so the cover
+  // and info take the full width instead of leaving an empty pane. Unknown
+  // counts as shown, matching LyricsView's stale-while-revalidate display.
+  const [displaySync, setDisplaySync] = useState<{ uri: string | null; ok: boolean }>({
+    uri: null,
+    ok: false,
+  })
+  const reportDisplaySync = useCallback((u: string | null, ok: boolean) => {
+    setDisplaySync({ uri: u, ok })
+  }, [])
+  const nowUri = liveNow?.uri ?? null
+  const showRight = showLyrics && !!nowUri && (displaySync.uri !== nowUri || displaySync.ok)
+
   return (
     <>
       <MeshBackdrop
@@ -479,7 +492,7 @@ export default function Display() {
         sample={sampleMesh}
         beatBus={beatBus}
       />
-      <main className={`wrap display${showLyrics ? ' has-lyrics' : ''}`}>
+      <main className={`wrap display${showRight ? ' show-lyrics' : ''}`}>
         <div
           className={`display-top${chromeIdle ? ' is-idle' : ''}`}
           onMouseEnter={() => holdChrome(true)}
@@ -641,8 +654,8 @@ export default function Display() {
           </div>
         )}
 
-        <div className="display-stage">
-          <section className="card display-hero" aria-live="polite">
+        <div className={`display-grid${showRight ? '' : ' solo'}`} aria-live="polite">
+          <section className="display-left">
             {liveNow ? (
               <>
                 {liveNow.image && (
@@ -677,15 +690,21 @@ export default function Display() {
               </>
             )}
           </section>
-        </div>
 
-        {showLyrics && (
-          <section className="display-lyrics-dock" aria-live="polite">
-            <div className="display-lyrics">
-              <LyricsView uri={liveNow?.uri ?? null} positionMs={elapsed} fontClass={lyricsFontClass} />
-            </div>
-          </section>
-        )}
+          {showRight && (
+            <section className="display-right" aria-label="Lyrics">
+              <div className="display-lyrics">
+                <LyricsView
+                  uri={nowUri}
+                  positionMs={elapsed}
+                  onSync={reportDisplaySync}
+                  fontClass={lyricsFontClass}
+                  fluid
+                />
+              </div>
+            </section>
+          )}
+        </div>
 
         {debug && (
           <BeatDebug

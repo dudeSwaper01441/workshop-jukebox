@@ -342,9 +342,6 @@ li.mine .num { color: var(--accent); font-weight: 650; }
 
 /* signage (TV) mode */
 .signage { position: fixed; inset: 0; z-index: 40; min-height: 100dvh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 56px 24px 40px; overflow: hidden; background: #000; }
-.signage-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(80px) brightness(0.5) saturate(1.5); transform: scale(1.25); animation: fadein 1.8s ease-out; }
-.signage-bg.under { animation: none; }
-@keyframes fadein { from { opacity: 0; } }
 .signage-shade { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.6) 100%); }
 /* wrap instead of running off the left edge on a narrow screen */
 .signage-controls { position: absolute; top: 16px; right: 16px; left: 16px; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; transition: opacity 0.3s; }
@@ -366,6 +363,33 @@ li.mine .num { color: var(--accent); font-weight: 650; }
    smaller, dimmer, highlights together with its primary line */
 .lyric-sub { display: block; font-size: 0.62em; font-weight: 600; opacity: 0.7; margin-top: 0.15em; }
 .lyrics-wrap { position: relative; min-width: 0; max-width: 100%; }
+/* Fluid (Apple-Music) lyrics, shared by /display and ApMu: big left-aligned
+   lines, the active line pure white, neighbours fading and blurring steeply.
+   Opted into per view via the `fluid` prop, so the karaoke view is unchanged. */
+.lyrics-fluid {
+  text-align: left;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+}
+.lyrics-fluid .lyric {
+  font-size: clamp(1.3rem, 2.6dvh, 1.9rem);
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.lyrics-fluid .lyric.active {
+  font-size: clamp(1.75rem, 3.9dvh, 2.8rem);
+  color: #fff;
+  transform: none;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.22);
+}
+.lyrics-fluid .lyric-sub {
+  font-size: 0.5em;
+  font-weight: 600;
+  opacity: 0.5;
+  margin-top: 0.08em;
+}
 /* Thai font selector for lyrics. Applied to .lyrics; defaults to --font-thai-auto. */
 .lyrics-font-noto { font-family: var(--font-thai-noto); }
 .lyrics-font-leelawadee { font-family: var(--font-thai-leelawadee); }
@@ -457,17 +481,18 @@ main.wrap.display {
   height: 100dvh;
   min-height: 0;
   padding: clamp(10px, 2dvh, 22px) 16px clamp(10px, 2dvh, 22px);
-  text-align: center;
+  text-align: left;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Size of the album cover. With the lyrics dock open the hero gets less
-     room, so the cover steps down instead of pushing the dock off-screen. */
-  --art-size: min(44dvh, 48vw, 520px);
+  /* Cover size for the solo (no-lyrics) layout: centered, a little larger. */
+  --art-size: clamp(200px, 34dvh, 360px);
 }
-main.wrap.display.has-lyrics {
-  --art-size: min(40dvh, 44vw, 460px);
+/* With the lyrics column open the cover shrinks, so the ring halo still fits
+   inside the left column instead of spilling under the lyrics. */
+main.wrap.display.show-lyrics {
+  --art-size: clamp(170px, 27dvh, 290px);
 }
 /* Nav + host banner share one auto-hide layer. Opacity only: layout never
    jumps when the chrome fades. Hiding takes 0.5s, waking takes 0.2s. */
@@ -683,21 +708,34 @@ body.cursor-hidden * { cursor: none !important; }
   letter-spacing: 0.06em;
 }
 .beat-listener-hint .beat-listener-retry { min-height: 32px; }
-/* Hero stage: takes whatever vertical space the nav and lyrics dock leave.
-   min-height:0 lets it actually shrink in a flex column (the default
-   min-height:auto would force the artwork to overflow). */
-.display-stage {
+/* Two-column projector layout: small cover + info left, large left-aligned
+   lyrics right. The grid takes the height the nav leaves and never scrolls. */
+.display-grid {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  column-gap: clamp(24px, 5vw, 96px);
+  align-items: start;
   overflow: hidden;
 }
+/* No synced lyrics (or Lyrics toggled off): one centered column. */
+.display-grid.solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+  margin: 0 auto;
+  justify-items: center;
+}
+.display-left {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+.display-grid.solo .display-left { align-items: center; text-align: center; }
 .display-greeting { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; font-style: italic; letter-spacing: 0.02em; }
-/* .card adds vertical margins; the hero is the centered stage content, so it
-   must not carry dead space above/below or the 720p layouts overflow. */
-.display-hero { display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.5dvh, 16px); padding: 0; margin: 0; min-height: 0; max-height: 100%; }
 /* Ring + cover share this wrapper. The wrapper is exactly the cover's size;
    the canvas is 200% of it and centered with a transform, so both centers are
    always identical regardless of window size. */
@@ -733,26 +771,30 @@ body.cursor-hidden * { cursor: none !important; }
   border: 1px solid var(--border);
   box-shadow: 0 24px 72px rgba(0,0,0,0.5);
 }
-.display-meta { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, 0.8dvh, 8px); max-width: 760px; min-width: 0; margin: 0 auto; text-align: center; }
+.display-meta { display: flex; flex-direction: column; align-items: flex-start; gap: clamp(4px, 0.8dvh, 8px); max-width: 100%; min-width: 0; margin: clamp(10px, 1.6dvh, 18px) 0 0; text-align: left; }
+.display-grid.solo .display-meta { align-items: center; text-align: center; }
 .now-spinning { font-size: clamp(0.66rem, 1.2dvh, 0.78rem); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.display-title { font-family: var(--font-serif); font-size: clamp(1.6rem, 4dvh + 0.8vw, 3.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: #f1f3f2; margin: 0; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
-.display-artist { font-size: clamp(1rem, 2.4dvh + 0.3vw, 1.7rem); color: var(--muted); margin-top: 4px; max-width: 100%; overflow-wrap: anywhere; }
-.display-time { font-size: clamp(0.9rem, 1.8dvh, 1.1rem); color: var(--muted); margin-top: clamp(4px, 0.8dvh, 12px); font-variant-numeric: tabular-nums; }
-.display-progress { width: min(560px, 84vw); height: 5px; margin-top: clamp(6px, 1.2dvh, 16px); flex-shrink: 0; }
+.display-title { font-family: var(--font-serif); font-size: clamp(1.4rem, 2.6dvh + 0.5vw, 2.1rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: #f1f3f2; margin: 0; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
+.display-artist { font-size: clamp(0.95rem, 1.8dvh + 0.2vw, 1.35rem); color: var(--muted); margin-top: 2px; max-width: 100%; overflow-wrap: anywhere; }
+.display-time { font-size: clamp(0.82rem, 1.5dvh, 1rem); color: var(--muted); margin-top: clamp(4px, 0.8dvh, 12px); font-variant-numeric: tabular-nums; }
+.display-progress { width: 100%; height: 5px; margin-top: clamp(6px, 1.2dvh, 14px); flex-shrink: 0; }
 .display-progress > i { border-radius: 2px; background: var(--accent); }
 
-/* Lyrics dock: a fixed-height strip pinned under the hero. The LyricsView
-   scroll box is sized to it, so the active line can be centered with one or
-   two neighbors visible and no page scrolling. */
-.display-lyrics-dock {
-  flex: 0 0 auto;
-  height: clamp(150px, 22dvh, 260px);
-  margin-top: clamp(4px, 1dvh, 12px);
-  padding: 6px 12px;
+/* Right column: the lyrics pane fills the height and centers on the active
+   line. A soft scrim keeps white text above 4.5:1 over the moving gradient,
+   and z-index lifts it above the ring canvas so the halo never shows through. */
+.display-right {
+  position: relative;
+  z-index: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(6px, 1.5dvh, 18px) clamp(8px, 1.4vw, 24px);
   border-radius: var(--radius);
-  border: 1px solid #ffffff12;
-  background: rgba(10, 12, 11, 0.5);
-  overflow: hidden;
+  background: radial-gradient(140% 130% at 12% 50%, rgba(4, 8, 7, 0.46) 0%, rgba(4, 8, 7, 0.2) 60%, rgba(4, 8, 7, 0) 100%);
 }
 .display-lyrics { height: 100%; min-height: 0; }
 .display-lyrics .lyrics-wrap { height: 100%; min-height: 0; display: flex; }
@@ -761,43 +803,40 @@ body.cursor-hidden * { cursor: none !important; }
   height: 100%;
   max-height: 100%;
   padding: 8px 4px;
+  text-align: left;
   scrollbar-width: none;
-  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
 }
 .display-lyrics .lyrics::-webkit-scrollbar { display: none; }
-.display-lyrics .lyric {
-  font-size: clamp(1rem, 1.9dvh, 1.5rem);
-  line-height: 1.35;
-  /* No font-size transition: an animating size moves every line's offset and
-     makes the active-line glide jitter while the track advances. */
-  transition: color 180ms ease, opacity 180ms ease;
-}
-.display-lyrics .lyric.active {
-  font-size: clamp(1.35rem, 2.6dvh, 2rem);
-  font-weight: 700;
-  color: #f4f7f5;
+
+/* Narrow/portrait screens: stack the cover above the lyrics. */
+@media (max-width: 899px) {
+  .display-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    row-gap: clamp(14px, 3dvh, 28px);
+  }
+  .display-left { align-self: center; align-items: center; text-align: center; }
+  .display-meta { align-items: center; text-align: center; }
+  main.wrap.display.show-lyrics { --art-size: clamp(160px, 30dvh, 260px); }
 }
 
-/* Small screens: tighter, art scales with viewport width */
+/* Small screens: tighter padding */
 @media (max-width: 640px) {
-  main.wrap.display { padding: 10px; --art-size: min(40dvh, 62vw, 300px); }
-  main.wrap.display.has-lyrics { --art-size: min(34dvh, 52vw, 240px); }
-  .display-progress { width: min(280px, 78vw); }
+  main.wrap.display { padding: 10px; }
 }
 
-/* Large projectors: let artwork and title breathe */
+/* Large projectors: let artwork and title breathe. */
 @media (min-width: 1440px) {
-  main.wrap.display { --art-size: min(44dvh, 46vw, 560px); }
-  main.wrap.display.has-lyrics { --art-size: min(40dvh, 42vw, 500px); }
-  .display-progress { width: min(700px, 72vw); }
+  main.wrap.display { --art-size: clamp(220px, 34dvh, 400px); }
+  main.wrap.display.show-lyrics { --art-size: clamp(190px, 27dvh, 320px); }
 }
 
-/* Short viewports (laptops on a projector, a phone in landscape): the cover
-   and the lyrics dock shrink together so nothing is ever clipped. */
+/* Short viewports (laptops on a projector, a phone in landscape): shrink the
+   cover so the cover and the lyrics both fit with no clipping. */
 @media (max-height: 640px) {
-  main.wrap.display { --art-size: min(36dvh, 34vw, 340px); }
-  main.wrap.display.has-lyrics { --art-size: min(30dvh, 30vw, 280px); }
-  .display-lyrics-dock { height: clamp(112px, 26dvh, 190px); }
+  main.wrap.display { --art-size: clamp(150px, 30dvh, 260px); }
+  main.wrap.display.show-lyrics { --art-size: clamp(130px, 24dvh, 210px); }
 }
 
 /* ---------- audio-reactive mesh backdrop ---------- */
@@ -903,10 +942,6 @@ body.cursor-hidden * { cursor: none !important; }
 main.wrap.display .card {
   background: rgba(10, 12, 11, 0.58);
   border-color: #ffffff12;
-}
-main.wrap.display .display-hero {
-  background: transparent;
-  border-color: transparent;
 }
 main.wrap.display .top { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
 main.wrap.display .head-right { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
@@ -1017,7 +1052,7 @@ main.wrap.display .display-artist { color: #e6e9e7; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .eq i, .status-live .status-dot, .skel, .modal, .signage-bg, .mesh-state.requesting i,
+  .eq i, .status-live .status-dot, .skel, .modal, .mesh-state.requesting i,
   .beat-listener-pill.connecting .beat-listener-dot { animation: none; }
   .progress > i, .signage-timewrap, .signage-song, .apmu-grid, .lyric, .signage-swap > *,
   .display-top, .display-nav .beat-listener-switch, .beat-listener-track,

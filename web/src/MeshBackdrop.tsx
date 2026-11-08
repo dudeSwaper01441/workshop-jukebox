@@ -80,6 +80,10 @@ void main() {
 
   // gentle rolloff keeps highlights from blowing out on cheap projectors
   col = col / (1.0 + col * 0.45);
+  // additive blob blending desaturates wherever two hues overlap; pull the
+  // saturation back up so strong-hue covers read vivid instead of grey
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = clamp(luma + (col - luma) * 1.45, 0.0, 1.0);
 
   float aspect = uRes.x / uRes.y;
   vec2 q = vec2(p.x / max(aspect, 0.0001), p.y) - 0.5;

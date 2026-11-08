@@ -18,6 +18,7 @@ export default function LyricsView({
   positionMs,
   onSync,
   fontClass = '',
+  fluid = false,
 }: {
   uri: string | null
   positionMs: number
@@ -26,6 +27,8 @@ export default function LyricsView({
   onSync?: (uri: string | null, ok: boolean) => void
   // Thai font class applied to the lyrics container (e.g. 'lyrics-font-noto')
   fontClass?: string
+  // Apple-Music look (big left-aligned lines, steep falloff) for /display + ApMu
+  fluid?: boolean
 }) {
   const [data, setData] = useState<LyricsData | null>(null)
   const [failedUri, setFailedUri] = useState<string | null>(null)
@@ -68,6 +71,10 @@ export default function LyricsView({
   const follow = !(held && heldUri === uri)
   let active = -1
   for (let i = 0; i < lines.length; i++) if (lines[i].ms <= positionMs) active = i
+
+  // fluid opts /display + ApMu into the Apple-Music look; the karaoke view
+  // keeps the original class. fontClass rides along either way.
+  const lyricsClass = ['lyrics', fluid ? 'lyrics-fluid' : '', fontClass].filter(Boolean).join(' ')
 
   // eased glide toward the active line (re-targeted every line change),
   // instead of one jump per line. uri is a dep so a song change re-anchors
@@ -151,16 +158,28 @@ export default function LyricsView({
         <div
           key={uri}
           ref={boxRef}
-          className={`lyrics ${fontClass}`.trim()}
+          className={lyricsClass}
           onWheel={pauseFollow}
           onTouchMove={pauseFollow}
         >
           {lines.map((l, i) => {
             const dist = Math.abs(i - active)
-            const o = stale ? 0.35 : i === active ? 1 : Math.max(0.22, 0.62 - dist * 0.1)
+            const o = stale
+              ? 0.35
+              : i === active
+                ? 1
+                : fluid
+                  ? Math.max(0, 0.68 - dist * 0.26)
+                  : Math.max(0.22, 0.62 - dist * 0.1)
             // Apple-Music-style depth: inactive lines soften with distance,
-            // the active line stays razor sharp
-            const blur = stale || i === active ? 0 : Math.min(0.4 + dist * 0.5, 2.5)
+            // the active line stays razor sharp. Fluid drops neighbours off
+            // faster so only a couple read at once.
+            const blur =
+              stale || i === active
+                ? 0
+                : fluid
+                  ? Math.min(0.5 + dist * 1.15, 8)
+                  : Math.min(0.4 + dist * 0.5, 2.5)
             return (
               <p
                 key={i}
@@ -182,7 +201,7 @@ export default function LyricsView({
     )
   if (fresh && fresh.plain.length)
     return (
-      <div key={uri} ref={boxRef} className={`lyrics ${fontClass}`.trim()}>
+      <div key={uri} ref={boxRef} className={lyricsClass}>
         {fresh.plain.map((t, i) => (
           <p key={i} className="lyric" style={{ '--o': 0.75 } as CSSProperties}>
             {t.text}
