@@ -83,16 +83,21 @@ export default function LyricsView({
       return
     }
     cancelAnimationFrame(raf.current)
+    // Time-based ease (not per-frame lerp) so the glide finishes in the same
+    // wall-clock time even on a slow projector/headless render loop. A fixed
+    // per-frame factor crawls for seconds when the frame rate drops.
+    const startAt = performance.now()
+    const startTop = box.scrollTop
+    const dist = target - startTop
+    const duration = Math.min(620, 220 + Math.abs(dist) * 0.35)
     const step = () => {
       const b = boxRef.current
       if (!b) return
-      const diff = target - b.scrollTop
-      if (Math.abs(diff) < 1) {
-        b.scrollTop = target
-        return
-      }
-      b.scrollTop += diff * 0.12
-      raf.current = requestAnimationFrame(step)
+      const p = Math.min(1, (performance.now() - startAt) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      b.scrollTop = startTop + dist * eased
+      if (p < 1) raf.current = requestAnimationFrame(step)
+      else b.scrollTop = target
     }
     raf.current = requestAnimationFrame(step)
   }, [active, follow, uri])

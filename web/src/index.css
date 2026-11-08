@@ -43,26 +43,6 @@ main.wrap { max-width: 640px; margin: 0 auto; padding: calc(16px + env(safe-area
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 0.98rem; letter-spacing: -0.01em; min-width: 0; }
 .brand svg { color: var(--accent); flex-shrink: 0; }
 .brand-sub { font-weight: 450; color: var(--muted); font-size: 0.78rem; font-style: italic; letter-spacing: 0.05em; text-transform: uppercase; }
-
-/* Host note: a warm, human line under the header. Changes with each song so
-   the screen feels run by a person, not a dashboard. */
-.host-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: #0f1411;
-  border: 1px solid #ffffff0f;
-  color: #d7ded9;
-  font-size: 0.86rem;
-  font-style: italic;
-  text-align: center;
-}
-.host-note .host-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-.host-note .host-divider { color: var(--muted); font-size: 0.8rem; }
-.host-note .host-requested { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
 .head-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .link { color: var(--muted); font-size: 0.82rem; text-decoration: none; white-space: nowrap; }
 .link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
@@ -207,31 +187,8 @@ button.ghost:hover:not(:disabled) { background: #ffffff0a; border-color: var(--b
 
 /* visualizer toggle: pressed = on, dimmed = off */
 button.ghost[aria-pressed='true']:not(:disabled) { background: #06b6d422; border-color: #06b6d480; color: #67e8f9; }
-.ring-audio-on { background: #06b6d422; border-color: #06b6d480; color: #67e8f9; }
 
 @keyframes beatPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-/* visualizer utilities (this project has no Tailwind; BeatRing relies on these) */
-.fixed { position: fixed; }
-.inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
-.z-0 { z-index: 0; }
-.z-50 { z-index: 50; }
-.pointer-events-none { pointer-events: none; }
-.top-4 { top: 1rem; }
-.left-4 { left: 1rem; }
-.flex { display: flex; }
-.items-center { align-items: center; }
-.gap-2 { gap: 0.5rem; }
-.w-3 { width: 0.75rem; }
-.h-3 { height: 0.75rem; }
-.rounded-full { border-radius: 9999px; }
-.text-xs { font-size: 0.75rem; line-height: 1rem; }
-.font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-.text-slate-200 { color: #e2e8f0; }
-.drop-shadow { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
-.opacity-50 { opacity: 0.5; }
-/* ring sits behind all page content */
-.z-neg1 { z-index: -1; }
 
 button.danger { background: transparent; border-color: #ff8f8f3d; color: var(--danger); }
 button.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: #ff8f8f66; }
@@ -417,8 +374,6 @@ li.mine .num { color: var(--accent); font-weight: 650; }
 .follow-pill { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); min-height: 0; padding: 6px 14px; font-size: 0.8rem; opacity: 0.9; }
 /* shown while the next song's lyrics load over the previous song's lines */
 .sync-pill { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1; font-size: 0.75rem; font-weight: 700; color: #d7ded9; background: #00000088; border: 1px solid #ffffff22; padding: 4px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; }
-.display-lyrics .lyrics { max-height: 36vh; padding: 12vh 4px; }
-.display-lyrics .lyric { font-size: clamp(1rem, 2.2vw, 1.4rem); }
 .signage-content { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 900px; min-width: 0; }
 .signage-content.wide { max-width: 1280px; width: 100%; }
 /* song <-> lyrics crossfade: both views share one grid cell.
@@ -492,48 +447,580 @@ li.q-item.ext { opacity: 0.92; }
   .apmu-right .lyrics { max-height: 34vh; padding-top: 6vh; padding-bottom: 6vh; }
 }
 
-/* display (projector) mode: warm, human, mixtape */
+/* display (projector) mode: warm, human, mixtape.
+   The whole page is exactly one viewport tall: the nav is a fixed row, the
+   hero stage absorbs the spare height, and the lyrics dock is pinned to the
+   bottom. Nothing scrolls, so the lyrics can never hide below the fold. */
 main.wrap.display {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 28px 16px 48px;
+  height: 100dvh;
+  min-height: 0;
+  padding: clamp(10px, 2dvh, 22px) 16px clamp(10px, 2dvh, 22px);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Size of the album cover. With the lyrics dock open the hero gets less
+     room, so the cover steps down instead of pushing the dock off-screen. */
+  --art-size: min(44dvh, 48vw, 520px);
+}
+main.wrap.display.has-lyrics {
+  --art-size: min(40dvh, 44vw, 460px);
+}
+/* Nav + host banner share one auto-hide layer. Opacity only: layout never
+   jumps when the chrome fades. Hiding takes 0.5s, waking takes 0.2s. */
+.display-top { position: relative; flex-shrink: 0; transition: opacity 0.15s ease; }
+.display-top.is-idle {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 0.5s;
+}
+body.cursor-hidden,
+body.cursor-hidden * { cursor: none !important; }
+
+/* Display nav: grouped controls with one shared height. Groups wrap rather
+   than overflow, and the dividers disappear before the controls get cramped. */
+.display-nav { align-items: flex-start; }
+.display-nav .head-right { gap: 8px; }
+.nav-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #ffffff05;
+}
+.nav-group { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.nav-divider { width: 1px; height: 24px; background: #ffffff14; flex-shrink: 0; margin: 0 2px; }
+.display-nav .head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  /* Brighter than --muted so the labels read from the back of a room and
+     clear 4.5:1 against the dark backdrop. */
+  color: #c9d2cc;
+  white-space: nowrap;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.display-nav .head-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: #ffffff0a;
+  border-color: var(--border-2);
+}
+.display-nav .head-btn:active:not(:disabled) { transform: translateY(1px); }
+.display-nav .mesh-state { min-height: 40px; border-radius: 9px; }
+
+/* Beat Listener: switch + text pill + hover/focus tooltip. The pill always has
+   a dot and a word, so the state never relies on colour alone. */
+.beat-listener {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.display-nav .beat-listener-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: #c9d2cc;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+.display-nav .beat-listener-switch:hover:not(:disabled) {
+  color: var(--text);
+  background: #ffffff0a;
+  border-color: var(--border-2);
+}
+.display-nav .beat-listener-switch.is-on {
+  color: #a5f3fc;
+  background: #06b6d422;
+  border-color: #06b6d480;
+}
+.beat-listener-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff1a;
+  border: 1px solid #ffffff26;
+  flex-shrink: 0;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+.beat-listener-knob {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9aa49e;
+  transform: translateY(-50%);
+  transition: transform 200ms ease, background 200ms ease;
+}
+.beat-listener-switch.is-on .beat-listener-track {
+  background: #06b6d455;
+  border-color: #06b6d4aa;
+}
+.beat-listener-switch.is-on .beat-listener-knob {
+  transform: translate(12px, -50%);
+  background: #67e8f9;
+}
+.beat-listener-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* The longest label is "Connecting...". Reserving its width keeps the nav
+     from shifting sideways when the listener changes state. */
+  min-width: 106px;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
+}
+.beat-listener-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.beat-listener-pill.off { color: #9aa49e; background: #ffffff08; border-color: #ffffff14; }
+.beat-listener-pill.connecting { color: #fcd34d; background: #f59e0b14; border-color: #f59e0b55; }
+.beat-listener-pill.connecting .beat-listener-dot { animation: beatPulse 1.1s ease-in-out infinite; }
+.beat-listener-pill.on { color: #86efac; background: #22c55e14; border-color: #22c55e55; }
+.beat-listener-pill.unavailable { color: #fca5a5; background: #ef444414; border-color: #ef444455; }
+.beat-listener-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-2);
+  background: #05060a;
+  color: var(--text);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  pointer-events: none;
+}
+.beat-listener:hover .beat-listener-tip,
+.beat-listener:focus-within .beat-listener-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+/* Out of the page flow: an actionable error must never push the hero down. */
+.beat-listener-hint {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #ef444455;
+  border-radius: 9px;
+  background: rgba(24, 8, 8, 0.74);
+  color: #fecaca;
+  font-size: 0.8rem;
+}
+.beat-listener-hint .beat-listener-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid #ffffff1f;
+  background: #05060a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.beat-listener-hint .beat-listener-cmd:hover:not(:disabled) {
+  background: #0b0f12;
+  border-color: #67e8f9;
+}
+.beat-listener-cmd code { font: inherit; }
+.beat-listener-copy {
+  color: #67e8f9;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.beat-listener-hint .beat-listener-retry { min-height: 32px; }
+/* Hero stage: takes whatever vertical space the nav and lyrics dock leave.
+   min-height:0 lets it actually shrink in a flex column (the default
+   min-height:auto would force the artwork to overflow). */
+.display-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
 }
 .display-greeting { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; font-style: italic; letter-spacing: 0.02em; }
-.display-hero { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 0; }
+/* .card adds vertical margins; the hero is the centered stage content, so it
+   must not carry dead space above/below or the 720p layouts overflow. */
+.display-hero { display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.5dvh, 16px); padding: 0; margin: 0; min-height: 0; max-height: 100%; }
+/* Ring + cover share this wrapper. The wrapper is exactly the cover's size;
+   the canvas is 200% of it and centered with a transform, so both centers are
+   always identical regardless of window size. */
+.display-art-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  isolation: isolate;
+}
+.display-art-wrap .display-art {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 1;
+}
+.ring-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* Height-driven so cover + title + progress always fit the stage. */
 .display-art {
-  width: min(420px, 72vw);
-  height: min(420px, 72vw);
+  width: var(--art-size);
+  height: var(--art-size);
   border-radius: 20px;
   object-fit: cover;
   margin: 0 auto;
   border: 1px solid var(--border);
   box-shadow: 0 24px 72px rgba(0,0,0,0.5);
 }
-.display-meta { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 760px; margin: 0 auto 14px; text-align: center; }
-.now-spinning { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.display-title { font-family: var(--font-serif); font-size: clamp(2rem, 7vw, 3.6rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: #f1f3f2; margin: 0; }
-.display-artist { font-size: clamp(1.1rem, 3.5vw, 1.7rem); color: var(--muted); margin-top: 4px; }
-.display-time { font-size: clamp(0.95rem, 2vw, 1.1rem); color: var(--muted); margin-top: 12px; font-variant-numeric: tabular-nums; }
-.display-progress { width: min(560px, 84vw); height: 5px; margin-top: 16px; }
+.display-meta { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, 0.8dvh, 8px); max-width: 760px; min-width: 0; margin: 0 auto; text-align: center; }
+.now-spinning { font-size: clamp(0.66rem, 1.2dvh, 0.78rem); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.display-title { font-family: var(--font-serif); font-size: clamp(1.6rem, 4dvh + 0.8vw, 3.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: #f1f3f2; margin: 0; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
+.display-artist { font-size: clamp(1rem, 2.4dvh + 0.3vw, 1.7rem); color: var(--muted); margin-top: 4px; max-width: 100%; overflow-wrap: anywhere; }
+.display-time { font-size: clamp(0.9rem, 1.8dvh, 1.1rem); color: var(--muted); margin-top: clamp(4px, 0.8dvh, 12px); font-variant-numeric: tabular-nums; }
+.display-progress { width: min(560px, 84vw); height: 5px; margin-top: clamp(6px, 1.2dvh, 16px); flex-shrink: 0; }
 .display-progress > i { border-radius: 2px; background: var(--accent); }
 
-/* Small screens: tighter, art scales with viewport */
+/* Lyrics dock: a fixed-height strip pinned under the hero. The LyricsView
+   scroll box is sized to it, so the active line can be centered with one or
+   two neighbors visible and no page scrolling. */
+.display-lyrics-dock {
+  flex: 0 0 auto;
+  height: clamp(150px, 22dvh, 260px);
+  margin-top: clamp(4px, 1dvh, 12px);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 1px solid #ffffff12;
+  background: rgba(10, 12, 11, 0.5);
+  overflow: hidden;
+}
+.display-lyrics { height: 100%; min-height: 0; }
+.display-lyrics .lyrics-wrap { height: 100%; min-height: 0; display: flex; }
+.display-lyrics .lyrics {
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  padding: 8px 4px;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+}
+.display-lyrics .lyrics::-webkit-scrollbar { display: none; }
+.display-lyrics .lyric {
+  font-size: clamp(1rem, 1.9dvh, 1.5rem);
+  line-height: 1.35;
+  /* No font-size transition: an animating size moves every line's offset and
+     makes the active-line glide jitter while the track advances. */
+  transition: color 180ms ease, opacity 180ms ease;
+}
+.display-lyrics .lyric.active {
+  font-size: clamp(1.35rem, 2.6dvh, 2rem);
+  font-weight: 700;
+  color: #f4f7f5;
+}
+
+/* Small screens: tighter, art scales with viewport width */
 @media (max-width: 640px) {
-  main.wrap.display { padding: 16px 12px 32px; }
-  .display-art { width: min(260px, 82vw); height: min(260px, 82vw); }
+  main.wrap.display { padding: 10px; --art-size: min(40dvh, 62vw, 300px); }
+  main.wrap.display.has-lyrics { --art-size: min(34dvh, 52vw, 240px); }
   .display-progress { width: min(280px, 78vw); }
 }
 
 /* Large projectors: let artwork and title breathe */
 @media (min-width: 1440px) {
-  .display-art { width: min(560px, 64vw); height: min(560px, 64vw); }
+  main.wrap.display { --art-size: min(44dvh, 46vw, 560px); }
+  main.wrap.display.has-lyrics { --art-size: min(40dvh, 42vw, 500px); }
   .display-progress { width: min(700px, 72vw); }
 }
-.display-queue { text-align: left; }
+
+/* Short viewports (laptops on a projector, a phone in landscape): the cover
+   and the lyrics dock shrink together so nothing is ever clipped. */
+@media (max-height: 640px) {
+  main.wrap.display { --art-size: min(36dvh, 34vw, 340px); }
+  main.wrap.display.has-lyrics { --art-size: min(30dvh, 30vw, 280px); }
+  .display-lyrics-dock { height: clamp(112px, 26dvh, 190px); }
+}
+
+/* ---------- audio-reactive mesh backdrop ---------- */
+/* Fixed full-screen layer behind every page element. The canvas is WebGL;
+   the CSS gradient underneath is the no-WebGL fallback. */
+.mesh-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  background: #05060a;
+}
+.mesh-backdrop canvas,
+.mesh-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.mesh-fallback {
+  filter: blur(42px) saturate(1.15);
+  transform: scale(1.12);
+  transform-origin: center;
+}
+.mesh-file-input { display: none; }
+
+/* Backdrop audio state, visible in the header. Gray = idle (no reaction),
+   amber = requesting permission, green = a live source is connected, red =
+   error. The debug overlay repeats this with the raw reason. */
+.mesh-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #ffffff08;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mesh-state i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+.mesh-state.active { color: #86efac; border-color: #22c55e55; background: #22c55e14; }
+.mesh-state.active i { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+/* connected but no signal: don't claim the audio is flowing */
+.mesh-state.active.silent { color: var(--muted); border-color: #ffffff1c; background: #ffffff08; }
+.mesh-state.active.silent i { background: #9aa49e; box-shadow: none; }
+.mesh-state.requesting { color: #fcd34d; border-color: #f59e0b55; background: #f59e0b14; }
+.mesh-state.requesting i { background: #f59e0b; animation: meshPulse 1s ease-in-out infinite; }
+.mesh-state.error { color: #fca5a5; border-color: #ef444455; background: #ef444414; }
+.mesh-state.error i { background: #ef4444; }
+.mesh-state.simulated { color: #93c5fd; border-color: #3b82f655; background: #3b82f614; }
+.mesh-state.simulated i { background: #3b82f6; }
+
+/* Out of the page flow: a permission/error banner must never squeeze the
+   fixed-height display layout. */
+.mesh-banner {
+  position: fixed;
+  top: clamp(56px, 8dvh, 84px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(760px, 92vw);
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ef444455;
+  background: rgba(24, 8, 8, 0.74);
+  color: #fecaca;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.mesh-banner.requesting {
+  border-color: #f59e0b55;
+  background: rgba(24, 16, 4, 0.74);
+  color: #fde68a;
+}
+.mesh-banner-detail {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  opacity: 0.78;
+}
+
+@keyframes meshPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* projector page: let the mesh breathe through the cards */
+main.wrap.display .card {
+  background: rgba(10, 12, 11, 0.58);
+  border-color: #ffffff12;
+}
+main.wrap.display .display-hero {
+  background: transparent;
+  border-color: transparent;
+}
+main.wrap.display .top { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
+main.wrap.display .head-right { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+main.wrap.display .display-title,
+main.wrap.display .display-artist { text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); }
+main.wrap.display .now-spinning,
+main.wrap.display .display-time,
+main.wrap.display .display-greeting { color: #d7ded9; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.65); }
+main.wrap.display .display-artist { color: #e6e9e7; }
+
+@media (max-width: 1100px) {
+  .nav-divider { display: none; }
+  .nav-group { flex-wrap: wrap; }
+}
+@media (max-width: 720px) {
+  main.wrap.display .top { flex-direction: column; align-items: stretch; gap: 8px; }
+  main.wrap.display .head-right { justify-content: flex-start; gap: 8px; }
+  .display-nav .head-right { justify-content: flex-start; }
+  .nav-group { flex: 1 1 auto; }
+  .beat-listener { flex: 1 1 auto; }
+}
+
+/* press D on /display for the analyser readout */
+.mesh-debug {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 60;
+  pointer-events: none;
+  min-width: 196px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #ffffff1c;
+  background: rgba(0, 0, 0, 0.66);
+  color: #d7ded9;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: left;
+  overflow-wrap: anywhere;
+  backdrop-filter: blur(8px);
+}
+.mesh-debug .row { display: flex; justify-content: space-between; gap: 14px; }
+.mesh-debug .row b { color: #f1f3f2; font-weight: 600; }
+.mesh-debug .bar {
+  height: 4px;
+  margin: 4px 0 6px;
+  border-radius: 2px;
+  background: #ffffff16;
+  overflow: hidden;
+}
+.mesh-debug .bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 90ms linear;
+}
+.mesh-debug .bar > i.thr { background: #67e8f9; }
+.mesh-debug .beat-on { color: var(--accent); text-shadow: 0 0 8px var(--accent); }
+.mesh-debug .mesh-msg { margin: 2px 0 6px; color: #aab4ae; }
+.mesh-debug .mesh-err {
+  margin: 0 0 6px;
+  color: #fca5a5;
+  white-space: pre-wrap;
+}
+.mesh-debug .mesh-state-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mesh-debug .mesh-state-text .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+.mesh-debug .mesh-state-text.disabled { color: #9aa49e; }
+.mesh-debug .mesh-state-text.requesting { color: #fcd34d; }
+.mesh-debug .mesh-state-text.requesting .dot { background: #f59e0b; }
+.mesh-debug .mesh-state-text.active { color: #86efac; }
+.mesh-debug .mesh-state-text.active .dot { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.mesh-debug .mesh-state-text.error { color: #fca5a5; }
+.mesh-debug .mesh-state-text.error .dot { background: #ef4444; }
+.mesh-debug .mesh-state-text.simulated { color: #93c5fd; }
+.mesh-debug .mesh-state-text.simulated .dot { background: #3b82f6; }
+.mesh-debug[data-state='error'] { border-color: #ef444466; }
+.mesh-debug[data-state='active'] { border-color: #22c55e55; }
+.mesh-debug .mesh-test-btn {
+  margin-top: 8px;
+  width: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ffffff26;
+  background: #ffffff10;
+  color: #e6e9e7;
+  font: inherit;
+}
+.mesh-debug .mesh-test-btn:hover:not(:disabled) { background: #ffffff1c; }
+.mesh-debug .mesh-test-btn:disabled { opacity: 0.6; cursor: progress; }
+.mesh-debug .mesh-test-out {
+  margin-top: 6px;
+  color: #a5f3fc;
+  font-size: 10px;
+  line-height: 1.4;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .eq i, .status-live .status-dot, .skel, .modal, .signage-bg { animation: none; }
-  .progress > i, .signage-timewrap, .signage-song, .apmu-grid, .lyric, .signage-swap > * { transition: none; }
+  .eq i, .status-live .status-dot, .skel, .modal, .signage-bg, .mesh-state.requesting i,
+  .beat-listener-pill.connecting .beat-listener-dot { animation: none; }
+  .progress > i, .signage-timewrap, .signage-song, .apmu-grid, .lyric, .signage-swap > *,
+  .display-top, .display-nav .beat-listener-switch, .beat-listener-track,
+  .beat-listener-knob, .beat-listener-pill, .beat-listener-tip { transition: none; }
   .lyric.active { transform: none; text-shadow: none; }
 }

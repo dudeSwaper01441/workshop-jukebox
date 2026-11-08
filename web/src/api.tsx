@@ -163,6 +163,8 @@ export function useJukebox(pin?: string) {
   useEffect(() => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${wsProto}//${window.location.host}/api/ws`)
+    let closed = false
+    let retry: ReturnType<typeof setTimeout> | null = null
 
     ws.onopen = () => {
       // Connected: fetch fresh state immediately
@@ -175,11 +177,16 @@ export function useJukebox(pin?: string) {
     }
 
     ws.onclose = () => {
+      if (closed) return
       // Reconnect after a short delay (key change remounts this effect)
-      setTimeout(() => setWsKey(k => k + 1), 2000)
+      retry = setTimeout(() => setWsKey((k) => k + 1), 2000)
     }
 
-    return () => ws.close()
+    return () => {
+      closed = true
+      if (retry) clearTimeout(retry)
+      ws.close()
+    }
   }, [refresh, wsKey])
 
   // lively = music context exists: poll fast (1s) so Now Playing, the queue,
