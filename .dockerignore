@@ -1,0 +1,20 @@
+# Dependencies and build output (reinstalled/rebuilt inside the image)
+**/node_modules
+**/dist
+
+# Secrets and machine-local runtime state (never bake into the image)
+**/.env
+server/tokens.json
+server/queue.json
+server/.cli-path
+
+# Local media / generated data (not used by the app)
+server/songs
+server/beatgrids
+
+# VCS, editor, logs, scratch
+.git
+.gitignore
+shots
+*.log
+file
