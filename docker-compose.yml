@@ -1,0 +1,42 @@
+# Turnkey Jukebox stack: the server image + a Cloudflare Quick Tunnel sidecar.
+#
+#   1. cd server && bun run auth        # one-time Spotify login -> server/tokens.json
+#   2. create an empty queue file:       New-Item server/queue.json -Force
+#   3. docker compose up --build
+#   4. read the public https://*.trycloudflare.com URL from:  docker compose logs tunnel
+#
+# Config (SPOTIFY_CLIENT_ID, ADMIN_PIN, MAX_PENDING, ...) is read from
+# server/.env automatically.
+
+services:
+  jukebox:
+    build: .
+    image: workshop-jukebox
+    init: true
+    restart: unless-stopped
+    env_file:
+      - path: ./server/.env
+        required: false
+    environment:
+      # Always listen on the container port; the mapping below is configurable.
+      PORT: 3000
+    ports:
+      # host:container — change the host side (e.g. 8080:3000) if 3000 is taken.
+      - "3000:3000"
+    volumes:
+      # Spotify login tokens (create with `bun run auth` in server/). Read-only.
+      - ./server/tokens.json:/app/server/tokens.json:ro
+      # Persisted queue. Must exist on the host first (see header), otherwise
+      # Docker creates a directory here and the server cannot write it.
+      - ./server/queue.json:/app/server/queue.json
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      # The image defines a HEALTHCHECK, so the tunnel waits until the server
+      # actually answers before publishing the link.
+      jukebox:
+        condition: service_healthy
+    # Quick Tunnel: no account needed, but the public URL changes on restart.
+    command: tunnel --no-autoupdate --protocol http2 --url http://jukebox:3000
