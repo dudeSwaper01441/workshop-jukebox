@@ -1,7 +1,7 @@
 # Turnkey Jukebox stack: the server image + a Cloudflare Quick Tunnel sidecar.
 #
 #   1. cd server && bun run auth        # one-time Spotify login -> server/tokens.json
-#   2. create an empty queue file:       New-Item server/queue.json -Force
+#   2. create an empty queue file (skip if it exists):  New-Item server/queue.json
 #   3. docker compose up --build
 #   4. read the public https://*.trycloudflare.com URL from:  docker compose logs tunnel
 #
